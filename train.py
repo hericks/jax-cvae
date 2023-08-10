@@ -27,7 +27,6 @@ def mnist():
         shape = (batch, 1, rows, cols)
         return jnp.array(array.array("B", fh.read()), dtype=jnp.uint8).reshape(shape)
 
-
 def infinite_dataloader(data, batch_size, *, rng):
     dataset_size = data.shape[0]
     indices = jnp.arange(dataset_size)
@@ -40,6 +39,7 @@ def infinite_dataloader(data, batch_size, *, rng):
             batch_indices = perm_indices[start:min(end, dataset_size)]
             start, end = end, end + batch_size
             yield data[batch_indices]
+
 
 if __name__ == "__main__":
 
