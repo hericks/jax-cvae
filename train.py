@@ -1,4 +1,3 @@
-import array
 import gzip
 import os
 import struct
@@ -25,7 +24,7 @@ def mnist():
     with gzip.open(target, "rb") as fh:
         _, batch, rows, cols = struct.unpack(">IIII", fh.read(16))
         shape = (batch, 1, rows, cols)
-        return jnp.array(array.array("B", fh.read()), dtype=jnp.uint8).reshape(shape)
+        return jnp.frombuffer(fh.read(), dtype=jnp.uint8).reshape(shape)
 
 def infinite_dataloader(data, batch_size, *, rng):
     dataset_size = data.shape[0]
