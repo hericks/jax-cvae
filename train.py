@@ -42,10 +42,8 @@ def mnist():
     
     return images, labels
 
-
-
-def infinite_dataloader(data, batch_size, *, rng):
-    dataset_size = data.shape[0]
+def infinite_dataloader(images, labels, batch_size, *, rng):
+    dataset_size = images.shape[0]
     indices = jnp.arange(dataset_size)
     while True:
         rng, perm_rng = jax.random.split(rng)
@@ -55,19 +53,19 @@ def infinite_dataloader(data, batch_size, *, rng):
         while start < dataset_size:
             batch_indices = perm_indices[start:min(end, dataset_size)]
             start, end = end, end + batch_size
-            yield data[batch_indices]
+            yield images[batch_indices], labels[batch_indices]
 
 
 if __name__ == "__main__":
 
-    data, labels = mnist()
-    dataset_size = data.shape[0]
+    images, labels = mnist()
+    dataset_size = images.shape[0]
     n_batches_per_epoch = (dataset_size + BATCH_SIZE - 1) // BATCH_SIZE
 
     rng = jax.random.PRNGKey(SEED)
-    for batch_idx, batch in enumerate(infinite_dataloader(data, BATCH_SIZE, rng=rng)):
+    for batch_idx, (image_batch, label_batch) in enumerate(infinite_dataloader(images, labels, BATCH_SIZE, rng=rng)):
         print("EPOCH: {0:2d} | BATCH: {1:2d} | SHAPE: {2}".format(
             batch_idx // n_batches_per_epoch,
             batch_idx % n_batches_per_epoch,
-            batch.shape,
+            image_batch.shape,
         ))
