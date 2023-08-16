@@ -116,14 +116,23 @@ if __name__ == "__main__":
     n_batches = n_batches_per_epoch * N_EPOCHS
 
     rng = jax.random.PRNGKey(SEED)
-    rng, dataloader_rng = jax.random.split(rng)
+    encoder_rng, decoder_rng, dataloader_rng, sample_rng = jax.random.split(rng, 4)
+
+    # initialize model
+    encoder = Encoder(rng=encoder_rng)
+    decoder = Decoder(rng=decoder_rng)
 
     # initialize dataloader
     train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
 
     for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
-        print("EPOCH: {0:2d} | BATCH: {1:2d} | SHAPE: {2}".format(
-            batch_idx // n_batches_per_epoch,
-            batch_idx % n_batches_per_epoch,
-            image_batch.shape,
-        ))
+        print("EPOCH: {0:2d} | BATCH: {1:3d}".format(batch_idx // n_batches_per_epoch, batch_idx % n_batches_per_epoch))
+
+        mean_batch, logvar_batch = jax.vmap(encoder)(image_batch)
+
+        # obtain samples in latent space
+        std_batch = jnp.exp(0.5 * logvar_batch)
+        standard_normal_samples = jax.random.normal(sample_rng, (mean_batch.shape[0], LATENT_DIM,))
+        latent_samples = mean_batch + std_batch * standard_normal_samples
+
+        reconstructed_batch = jax.vmap(decoder)(latent_samples)
