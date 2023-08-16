@@ -6,8 +6,12 @@ import urllib.request
 import jax
 import jax.numpy as jnp
 
+# GENERAL
 SEED = 42
-BATCH_SIZE = 5123
+
+# TRAINING
+N_EPOCHS = 1
+BATCH_SIZE = 100
 
 def mnist():
     url_dir = "https://storage.googleapis.com/cvdf-datasets/mnist"
@@ -61,9 +65,15 @@ if __name__ == "__main__":
     images, labels = mnist()
     dataset_size = images.shape[0]
     n_batches_per_epoch = (dataset_size + BATCH_SIZE - 1) // BATCH_SIZE
+    n_batches = n_batches_per_epoch * N_EPOCHS
 
     rng = jax.random.PRNGKey(SEED)
-    for batch_idx, (image_batch, label_batch) in enumerate(infinite_dataloader(images, labels, BATCH_SIZE, rng=rng)):
+    rng, dataloader_rng = jax.random.split(rng)
+
+    # initialize dataloader
+    train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
+
+    for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
         print("EPOCH: {0:2d} | BATCH: {1:2d} | SHAPE: {2}".format(
             batch_idx // n_batches_per_epoch,
             batch_idx % n_batches_per_epoch,
