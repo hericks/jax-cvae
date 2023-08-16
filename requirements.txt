@@ -1,8 +1,12 @@
+equinox==0.10.4
 importlib-metadata==6.8.0
 jax==0.4.13
 jaxlib==0.4.13
+jaxtyping==0.2.19
 ml-dtypes==0.2.0
 numpy==1.24.4
 opt-einsum==3.3.0
 scipy==1.10.1
+typeguard==4.1.1
+typing_extensions==4.7.1
 zipp==3.16.2
