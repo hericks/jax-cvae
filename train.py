@@ -3,16 +3,64 @@ import os
 import struct
 import urllib.request
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 # GENERAL
 SEED = 42
 
+# NETWORK ARCHITECTURE
+HIDDEN_DIM = 32
+LATENT_DIM = 2
+
 # TRAINING
 N_EPOCHS = 1
 BATCH_SIZE = 100
 
+
+class Encoder(eqx.Module):
+    hidden: eqx.nn.Linear
+    logvar: eqx.nn.Linear
+    mean: eqx.nn.Linear
+
+    def __init__(self, *, rng):
+        hidden_rng, mean_rng, logvar_rng = jax.random.split(rng, 3)
+        self.hidden = eqx.nn.Linear(
+            in_features=28*28, out_features=HIDDEN_DIM, key=hidden_rng
+        )
+        self.logvar = eqx.nn.Linear(
+            in_features=HIDDEN_DIM, out_features=LATENT_DIM, key=logvar_rng
+        )
+        self.mean = eqx.nn.Linear(
+            in_features=HIDDEN_DIM, out_features=LATENT_DIM, key=mean_rng
+        )
+
+    def __call__(self, x):
+        x = jnp.ravel(x)
+        x = self.hidden(x)
+        x = jax.nn.sigmoid(x)
+        return self.mean(x), self.logvar(x)
+
+class Decoder(eqx.Module):
+    hidden: eqx.nn.Linear
+    output: eqx.nn.Linear
+
+    def __init__(self, *, rng):
+        hidden_rng, output_rng = jax.random.split(rng)
+        self.hidden = eqx.nn.Linear(
+            in_features=LATENT_DIM, out_features=HIDDEN_DIM, key=hidden_rng
+        )
+        self.output = eqx.nn.Linear(
+            in_features=HIDDEN_DIM, out_features=28*28, key=output_rng
+        )
+
+    def __call__(self, z):
+        z = self.hidden(z)
+        z = jax.nn.sigmoid(z)
+        z = self.output(z)
+        return jnp.reshape(z, (1, 28, 28))
+    
 def mnist():
     url_dir = "https://storage.googleapis.com/cvdf-datasets/mnist"
     target_dir = os.getcwd() + "/data/mnist"
