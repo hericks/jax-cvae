@@ -59,6 +59,7 @@ class Decoder(eqx.Module):
         z = self.hidden(z)
         z = jax.nn.sigmoid(z)
         z = self.output(z)
+        z = jax.nn.sigmoid(z)
         return jnp.reshape(z, (1, 28, 28))
     
 class VAE(eqx.Module):
