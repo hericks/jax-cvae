@@ -16,7 +16,7 @@ LATENT_DIM = 2
 
 # TRAINING
 N_EPOCHS = 1
-BATCH_SIZE = 100
+BATCH_SIZE = 500
 
 
 class Encoder(eqx.Module):
@@ -60,6 +60,26 @@ class Decoder(eqx.Module):
         z = jax.nn.sigmoid(z)
         z = self.output(z)
         return jnp.reshape(z, (1, 28, 28))
+    
+class VAE(eqx.Module):
+    encoder: Encoder
+    decoder: Decoder
+
+    def __init__(self, *, rng):
+        encoder_rng, decoder_rng = jax.random.split(rng)
+        self.encoder = Encoder(rng=encoder_rng)
+        self.decoder = Decoder(rng=decoder_rng)
+
+    def __call__(self, x, *, rng):
+        mean, logvar = self.encoder(x)
+        z = self.reparameterize(mean, logvar, rng=rng)
+        x_recon = self.decoder(z)
+        return x_recon, mean, logvar
+
+    def reparameterize(self, mean, logvar, *, rng):
+        std = jnp.exp(0.5 * logvar)
+        eps = jax.random.normal(rng, mean.shape)
+        return mean + eps * std
     
 def mnist():
     url_dir = "https://storage.googleapis.com/cvdf-datasets/mnist"
@@ -116,11 +136,10 @@ if __name__ == "__main__":
     n_batches = n_batches_per_epoch * N_EPOCHS
 
     rng = jax.random.PRNGKey(SEED)
-    encoder_rng, decoder_rng, dataloader_rng, sample_rng = jax.random.split(rng, 4)
+    rng, model_rng, dataloader_rng = jax.random.split(rng, 3)
 
     # initialize model
-    encoder = Encoder(rng=encoder_rng)
-    decoder = Decoder(rng=decoder_rng)
+    vae = VAE(rng=model_rng)
 
     # initialize dataloader
     train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
@@ -128,11 +147,8 @@ if __name__ == "__main__":
     for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
         print("EPOCH: {0:2d} | BATCH: {1:3d}".format(batch_idx // n_batches_per_epoch, batch_idx % n_batches_per_epoch))
 
-        mean_batch, logvar_batch = jax.vmap(encoder)(image_batch)
+        # split PRNG key across batch
+        rng, forward_rng = jax.random.split(rng)
+        forward_rng = jax.random.split(forward_rng, image_batch.shape[0])
 
-        # obtain samples in latent space
-        std_batch = jnp.exp(0.5 * logvar_batch)
-        standard_normal_samples = jax.random.normal(sample_rng, (mean_batch.shape[0], LATENT_DIM,))
-        latent_samples = mean_batch + std_batch * standard_normal_samples
-
-        reconstructed_batch = jax.vmap(decoder)(latent_samples)
+        x_recon, mean, logvar = jax.vmap(vae)(image_batch, rng=forward_rng)
