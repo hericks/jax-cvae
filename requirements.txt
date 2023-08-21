@@ -1,5 +1,8 @@
+absl-py==2.0.0
+chex==0.1.7
 contourpy==1.1.0
 cycler==0.11.0
+dm-tree==0.1.8
 equinox==0.10.4
 fonttools==4.42.0
 importlib-metadata==6.8.0
@@ -12,12 +15,14 @@ matplotlib==3.7.2
 ml-dtypes==0.2.0
 numpy==1.24.4
 opt-einsum==3.3.0
+optax==0.1.7
 packaging==23.1
 Pillow==10.0.0
 pyparsing==3.0.9
 python-dateutil==2.8.2
 scipy==1.10.1
 six==1.16.0
+toolz==0.12.0
 typeguard==4.1.1
 typing_extensions==4.7.1
 zipp==3.16.2
