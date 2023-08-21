@@ -6,6 +6,8 @@ import urllib.request
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import optax
 
 # GENERAL
 SEED = 42
@@ -139,8 +141,10 @@ if __name__ == "__main__":
     rng = jax.random.PRNGKey(SEED)
     rng, model_rng, dataloader_rng = jax.random.split(rng, 3)
 
-    # initialize model
+    # initialize model and optimizer state
     vae = VAE(rng=model_rng)
+    optim = optax.adam(learning_rate=3e-4)
+    opt_state = optim.init(eqx.filter(vae, eqx.is_array))
 
     # initialize dataloader
     train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
