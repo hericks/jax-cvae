@@ -130,6 +130,24 @@ def infinite_dataloader(images, labels, batch_size, *, rng):
             start, end = end, end + batch_size
             yield images[batch_indices], labels[batch_indices]
 
+def reconstruction_error(mean, sample):
+    # TODO. Add variance term
+    return 0.5 * jnp.mean(jnp.square(mean - sample))
+
+def kullback_leibler_divergence(mean, logvar):
+    return - 0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
+
+def vae_loss(model, x, *, rng):
+    rng_batch = jax.random.split(rng, x.shape[0])
+
+    x_recon, mean, logvar = jax.vmap(model)(x, rng=rng_batch)
+
+    kl = jax.vmap(kullback_leibler_divergence)(mean, logvar)
+    neg_recon_error = - jax.vmap(reconstruction_error)(x_recon, x)
+    elbo = - kl + neg_recon_error
+
+    return - jnp.mean(elbo)
+
 
 if __name__ == "__main__":
 
@@ -153,7 +171,11 @@ if __name__ == "__main__":
         print("EPOCH: {0:2d} | BATCH: {1:3d}".format(batch_idx // n_batches_per_epoch, batch_idx % n_batches_per_epoch))
 
         # split PRNG key across batch
-        rng, forward_rng = jax.random.split(rng)
+        rng, forward_rng, loss_rng = jax.random.split(rng, 3)
         forward_rng = jax.random.split(forward_rng, image_batch.shape[0])
 
         x_recon, mean, logvar = jax.vmap(vae)(image_batch, rng=forward_rng)
+
+        loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, image_batch, rng=loss_rng)
+        updates, opt_state = optim.update(grads, opt_state, vae)
+        vae = eqx.apply_updates(vae, updates)
