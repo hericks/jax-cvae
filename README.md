@@ -20,8 +20,14 @@ $$
     \mathcal{N}(\mu_1, \Sigma_1) \mid\mid \mathcal{N}(\mu_2, \Sigma_2)
 ) =
 \frac{1}{2} \left(
-    \log \frac{\Sigma_2}{\Sigma_1} - n + \text{tr}(\Sigma_2^{-1} \Sigma_1) +
-    (\mu_2 - \mu_1)^\top \Sigma_2^{-1} (\mu_2 - \mu_1)
+    \log \frac{
+        \det \Sigma_2
+    }{
+        \det \Sigma_1
+    }
+    - n
+    + \text{tr}(\Sigma_2^{-1} \Sigma_1)
+    + (\mu_2 - \mu_1)^\top \Sigma_2^{-1} (\mu_2 - \mu_1)
 \right).
 $$
 
