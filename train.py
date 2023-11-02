@@ -175,7 +175,10 @@ if __name__ == "__main__":
         # split PRNG key
         rng, loss_rng = jax.random.split(rng)
 
+        # compute loss value and gradient
         loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, image_batch, rng=loss_rng)
+
+        # transform gradient and apply updates to model
         updates, opt_state = optim.update(grads, opt_state, vae)
         vae = eqx.apply_updates(vae, updates)
 
