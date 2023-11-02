@@ -167,11 +167,6 @@ if __name__ == "__main__":
     train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
 
     for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
-        print(
-            "EPOCH: {0:2d} | BATCH: {1:3d}".format(batch_idx // n_batches_per_epoch, batch_idx % n_batches_per_epoch),
-            end=" | "
-        )
-
         # split PRNG key
         rng, loss_rng = jax.random.split(rng)
 
@@ -182,4 +177,11 @@ if __name__ == "__main__":
         updates, opt_state = optim.update(grads, opt_state, vae)
         vae = eqx.apply_updates(vae, updates)
 
-        print("LOSS: {0:.4f}".format(loss))
+        # log metrics
+        epoch, batch = divmod(batch_idx, n_batches_per_epoch)
+        logging_components = [
+            "EPOCH: {0:2d}".format(epoch),
+            "BATCH: {0:3d}".format(batch),
+            "LOSS: {0:.4f}".format(loss),
+        ]
+        print(" | ".join(logging_components))
