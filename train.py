@@ -6,7 +6,6 @@ import urllib.request
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import optax
 
 # GENERAL
@@ -17,7 +16,7 @@ HIDDEN_DIM = 32
 LATENT_DIM = 2
 
 # TRAINING
-N_EPOCHS = 1
+N_EPOCHS = 10
 BATCH_SIZE = 500
 
 
@@ -168,7 +167,10 @@ if __name__ == "__main__":
     train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
 
     for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
-        print("EPOCH: {0:2d} | BATCH: {1:3d}".format(batch_idx // n_batches_per_epoch, batch_idx % n_batches_per_epoch))
+        print(
+            "EPOCH: {0:2d} | BATCH: {1:3d}".format(batch_idx // n_batches_per_epoch, batch_idx % n_batches_per_epoch),
+            end=" | "
+        )
 
         # split PRNG key across batch
         rng, forward_rng, loss_rng = jax.random.split(rng, 3)
@@ -179,3 +181,5 @@ if __name__ == "__main__":
         loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, image_batch, rng=loss_rng)
         updates, opt_state = optim.update(grads, opt_state, vae)
         vae = eqx.apply_updates(vae, updates)
+
+        print("LOSS: {0:.4f}".format(loss))
