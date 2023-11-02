@@ -172,11 +172,8 @@ if __name__ == "__main__":
             end=" | "
         )
 
-        # split PRNG key across batch
-        rng, forward_rng, loss_rng = jax.random.split(rng, 3)
-        forward_rng = jax.random.split(forward_rng, image_batch.shape[0])
-
-        x_recon, mean, logvar = jax.vmap(vae)(image_batch, rng=forward_rng)
+        # split PRNG key
+        rng, loss_rng = jax.random.split(rng)
 
         loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, image_batch, rng=loss_rng)
         updates, opt_state = optim.update(grads, opt_state, vae)
