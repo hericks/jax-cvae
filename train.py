@@ -166,16 +166,20 @@ if __name__ == "__main__":
     # initialize dataloader
     train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
 
-    for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
-        # split PRNG key
-        rng, loss_rng = jax.random.split(rng)
-
-        # compute loss value and gradient
-        loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, image_batch, rng=loss_rng)
-
-        # transform gradient and apply updates to model
+    # define jitted training step function
+    @eqx.filter_jit
+    def make_step(vae, opt_state, x, *, rng):
+        loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, x, rng=rng)
         updates, opt_state = optim.update(grads, opt_state, vae)
         vae = eqx.apply_updates(vae, updates)
+        return vae, opt_state, loss
+
+    for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
+        # split PRNG key
+        rng, step_rng = jax.random.split(rng)
+
+        # perform training step
+        vae, opt_state, loss = make_step(vae, opt_state, image_batch, rng=step_rng)
 
         # log metrics
         epoch, batch = divmod(batch_idx, n_batches_per_epoch)
