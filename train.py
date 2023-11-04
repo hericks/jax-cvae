@@ -131,7 +131,7 @@ def infinite_dataloader(images, labels, batch_size, *, rng):
 
 def reconstruction_error(mean, sample):
     # TODO. Add variance term
-    return 0.5 * jnp.mean(jnp.square(mean - sample))
+    return 0.5 * jnp.sum(jnp.square(mean - sample))
 
 def kullback_leibler_divergence(mean, logvar):
     return - 0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
