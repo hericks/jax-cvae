@@ -80,7 +80,7 @@ class VAE(eqx.Module):
 
     def reparameterize(self, mean, logvar, *, rng):
         std = jnp.exp(0.5 * logvar)
-        eps = jax.random.normal(rng, mean.shape)
+        eps = jax.random.normal(rng, (LATENT_DIM,))
         return mean + eps * std
     
 def mnist():
