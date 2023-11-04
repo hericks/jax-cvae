@@ -12,12 +12,12 @@ import optax
 SEED = 42
 
 # NETWORK ARCHITECTURE
-HIDDEN_DIM = 32
+HIDDEN_DIM = 128
 LATENT_DIM = 2
 
 # TRAINING
 N_EPOCHS = 10
-BATCH_SIZE = 500
+BATCH_SIZE = 100
 
 
 class Encoder(eqx.Module):
