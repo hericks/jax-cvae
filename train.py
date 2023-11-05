@@ -6,18 +6,8 @@ import urllib.request
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
-
-# GENERAL
-SEED = 42
-
-# NETWORK ARCHITECTURE
-HIDDEN_DIM = 128
-LATENT_DIM = 2
-
-# TRAINING
-N_EPOCHS = 10
-BATCH_SIZE = 100
 
 
 class Encoder(eqx.Module):
@@ -150,6 +140,15 @@ def vae_loss(model, x, *, rng):
 
 if __name__ == "__main__":
 
+    SEED = 42
+    LEARNING_RATE = 0.005
+
+    HIDDEN_DIM = 128
+    LATENT_DIM = 6
+
+    N_EPOCHS = 20
+    BATCH_SIZE = 128
+
     images, labels = mnist()
     dataset_size = images.shape[0]
     n_batches_per_epoch = (dataset_size + BATCH_SIZE - 1) // BATCH_SIZE
@@ -160,7 +159,7 @@ if __name__ == "__main__":
 
     # initialize model and optimizer state
     vae = VAE(rng=model_rng)
-    optim = optax.adam(learning_rate=3e-4)
+    optim = optax.adam(learning_rate=LEARNING_RATE)
     opt_state = optim.init(eqx.filter(vae, eqx.is_array))
 
     # initialize dataloader
@@ -183,9 +182,16 @@ if __name__ == "__main__":
 
         # log metrics
         epoch, batch = divmod(batch_idx, n_batches_per_epoch)
-        logging_components = [
-            "EPOCH: {0:2d}".format(epoch),
-            "BATCH: {0:3d}".format(batch),
-            "LOSS: {0:.4f}".format(loss),
-        ]
-        print(" | ".join(logging_components))
+
+        if batch == 0:
+            losses = np.zeros((n_batches_per_epoch,))
+
+        losses[batch] = loss
+
+        if batch == n_batches_per_epoch - 1:
+            logging_components = [
+                "EPOCH: {0:2d}".format(epoch),
+                "BATCH: {0:3d}".format(batch),
+                "LOSS: {0:.4f}".format(losses.mean()),
+            ]
+            print(" | ".join(logging_components))
