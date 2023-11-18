@@ -158,6 +158,9 @@ if __name__ == "__main__":
     p.add_argument('--hidden_dim', type=int, help="encoder and decoder hidden dimension", default=128)
     p.add_argument('--latent_dim', type=int, help="latent dimension", default=6)
 
+    # vae
+    p.add_argument('--conditional', action="store_true")
+
     # training / optimisation
     p.add_argument('--learning_rate', type=float, help="ADAM learning rate", default=3e-4)
     p.add_argument('--batch_size', type=int, help="mini-batch size", default=128)
