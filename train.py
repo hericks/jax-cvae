@@ -3,6 +3,8 @@ import os
 import struct
 import urllib.request
 
+import configargparse
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -15,16 +17,16 @@ class Encoder(eqx.Module):
     logvar: eqx.nn.Linear
     mean: eqx.nn.Linear
 
-    def __init__(self, *, rng):
+    def __init__(self, hidden_dim, latent_dim, *, rng):
         hidden_rng, mean_rng, logvar_rng = jax.random.split(rng, 3)
         self.hidden = eqx.nn.Linear(
-            in_features=28*28, out_features=HIDDEN_DIM, key=hidden_rng
+            in_features=28*28, out_features=hidden_dim, key=hidden_rng
         )
         self.logvar = eqx.nn.Linear(
-            in_features=HIDDEN_DIM, out_features=LATENT_DIM, key=logvar_rng
+            in_features=hidden_dim, out_features=latent_dim, key=logvar_rng
         )
         self.mean = eqx.nn.Linear(
-            in_features=HIDDEN_DIM, out_features=LATENT_DIM, key=mean_rng
+            in_features=hidden_dim, out_features=latent_dim, key=mean_rng
         )
 
     def __call__(self, x):
@@ -37,13 +39,13 @@ class Decoder(eqx.Module):
     hidden: eqx.nn.Linear
     output: eqx.nn.Linear
 
-    def __init__(self, *, rng):
+    def __init__(self, hidden_dim, latent_dim, *, rng):
         hidden_rng, output_rng = jax.random.split(rng)
         self.hidden = eqx.nn.Linear(
-            in_features=LATENT_DIM, out_features=HIDDEN_DIM, key=hidden_rng
+            in_features=latent_dim, out_features=hidden_dim, key=hidden_rng
         )
         self.output = eqx.nn.Linear(
-            in_features=HIDDEN_DIM, out_features=28*28, key=output_rng
+            in_features=hidden_dim, out_features=28*28, key=output_rng
         )
 
     def __call__(self, z):
@@ -57,10 +59,10 @@ class VAE(eqx.Module):
     encoder: Encoder
     decoder: Decoder
 
-    def __init__(self, *, rng):
+    def __init__(self, hidden_dim, latent_dim, *, rng):
         encoder_rng, decoder_rng = jax.random.split(rng)
-        self.encoder = Encoder(rng=encoder_rng)
-        self.decoder = Decoder(rng=decoder_rng)
+        self.encoder = Encoder(hidden_dim, latent_dim, rng=encoder_rng)
+        self.decoder = Decoder(hidden_dim, latent_dim, rng=decoder_rng)
 
     def __call__(self, x, *, rng):
         mean, logvar = self.encoder(x)
@@ -70,7 +72,7 @@ class VAE(eqx.Module):
 
     def reparameterize(self, mean, logvar, *, rng):
         std = jnp.exp(0.5 * logvar)
-        eps = jax.random.normal(rng, (LATENT_DIM,))
+        eps = jax.random.normal(rng, mean.shape)
         return mean + eps * std
     
 def mnist():
@@ -146,31 +148,42 @@ def vae_loss(model, x, *, rng):
 
 
 if __name__ == "__main__":
+    # initialize argparser
+    p = configargparse.ArgParser()
 
-    SEED = 42
-    LEARNING_RATE = 0.005
+    # seed
+    p.add_argument('--seed', type=int, default=42)
 
-    HIDDEN_DIM = 128
-    LATENT_DIM = 6
+    # architecture
+    p.add_argument('--hidden_dim', type=int, default=128)
+    p.add_argument('--latent_dim', type=int, default=6)
 
-    N_EPOCHS = 20
-    BATCH_SIZE = 128
+    # training / optimisation
+    p.add_argument('--learning_rate', type=float, default=3e-4)
+    p.add_argument('--n_epochs', default=10)
+    p.add_argument('--batch_size', default=128)
 
+    # obtain and log arguments to console
+    args = p.parse_args()
+    print(p.format_values())
+
+    # prepare training parameters
     images, labels = mnist()
     dataset_size = images.shape[0]
-    n_batches_per_epoch = (dataset_size + BATCH_SIZE - 1) // BATCH_SIZE
-    n_batches = n_batches_per_epoch * N_EPOCHS
+    n_batches_per_epoch = (dataset_size + args.batch_size - 1) // args.batch_size
+    n_batches = n_batches_per_epoch * args.n_epochs
 
-    rng = jax.random.PRNGKey(SEED)
+    # obtain keys for pseudo-random number generators
+    rng = jax.random.PRNGKey(args.seed)
     rng, model_rng, dataloader_rng = jax.random.split(rng, 3)
 
     # initialize model and optimizer state
-    vae = VAE(rng=model_rng)
-    optim = optax.adam(learning_rate=LEARNING_RATE)
+    vae = VAE(hidden_dim=args.hidden_dim, latent_dim=args.latent_dim, rng=model_rng)
+    optim = optax.adam(learning_rate=args.learning_rate)
     opt_state = optim.init(eqx.filter(vae, eqx.is_array))
 
     # initialize dataloader
-    train_dataloader = infinite_dataloader(images / 255, labels, BATCH_SIZE, rng=dataloader_rng)
+    train_dataloader = infinite_dataloader(images / 255, labels, args.batch_size, rng=dataloader_rng)
 
     # define jitted training step function
     @eqx.filter_jit
@@ -180,6 +193,7 @@ if __name__ == "__main__":
         vae = eqx.apply_updates(vae, updates)
         return vae, opt_state, loss
 
+    # training loop
     for batch_idx, (image_batch, label_batch) in zip(range(n_batches), train_dataloader):
         # split PRNG key
         rng, step_rng = jax.random.split(rng)
