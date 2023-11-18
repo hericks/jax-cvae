@@ -128,7 +128,7 @@ def bernoulli_log_likelihood(logits, labels):
     return - jnp.sum(labels * jnp.log(logits) + (1.0 - labels) * jnp.log(1 - logits))
 
 def reconstruction_error(mean, sample):
-    bernoulli_log_likelihood(logits=mean, labels=sample)
+    return bernoulli_log_likelihood(logits=mean, labels=sample)
 
 def kullback_leibler_divergence(mean, logvar):
     return - 0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
