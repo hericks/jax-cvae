@@ -152,16 +152,16 @@ if __name__ == "__main__":
     p = configargparse.ArgParser()
 
     # seed
-    p.add_argument('--seed', type=int, default=42)
+    p.add_argument('--seed', type=int, help="global seed", default=42)
 
     # architecture
-    p.add_argument('--hidden_dim', type=int, default=128)
-    p.add_argument('--latent_dim', type=int, default=6)
+    p.add_argument('--hidden_dim', type=int, help="encoder and decoder hidden dimension", default=128)
+    p.add_argument('--latent_dim', type=int, help="latent dimension", default=6)
 
     # training / optimisation
-    p.add_argument('--learning_rate', type=float, default=3e-4)
-    p.add_argument('--n_epochs', type=int, default=10)
-    p.add_argument('--batch_size', type=int, default=128)
+    p.add_argument('--learning_rate', type=float, help="ADAM learning rate", default=3e-4)
+    p.add_argument('--batch_size', type=int, help="mini-batch size", default=128)
+    p.add_argument('--n_epochs', type=int, help="number of epochs", default=10)
 
     # obtain and log arguments to console
     args = p.parse_args()
