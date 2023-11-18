@@ -167,12 +167,6 @@ if __name__ == "__main__":
     args = p.parse_args()
     print(p.format_values())
 
-    # prepare training parameters
-    images, labels = mnist()
-    dataset_size = images.shape[0]
-    n_batches_per_epoch = (dataset_size + args.batch_size - 1) // args.batch_size
-    n_batches = n_batches_per_epoch * args.n_epochs
-
     # obtain keys for pseudo-random number generators
     rng = jax.random.PRNGKey(args.seed)
     rng, model_rng, dataloader_rng = jax.random.split(rng, 3)
@@ -182,8 +176,16 @@ if __name__ == "__main__":
     optim = optax.adam(learning_rate=args.learning_rate)
     opt_state = optim.init(eqx.filter(vae, eqx.is_array))
 
-    # initialize dataloader
-    train_dataloader = infinite_dataloader(images / 255, labels, args.batch_size, rng=dataloader_rng)
+    # prepare training parameters
+    images, labels = mnist()
+    dataset_size = images.shape[0]
+    n_batches_per_epoch = (dataset_size + args.batch_size - 1) // args.batch_size
+    n_batches = n_batches_per_epoch * args.n_epochs
+
+    # scale images, one-hot encode labels, and initialize dataloader
+    images = images / 255
+    labels = np.eye(10).take(labels, axis=0).squeeze(1)
+    train_dataloader = infinite_dataloader(images, labels, args.batch_size, rng=dataloader_rng)
 
     # define jitted training step function
     @eqx.filter_jit
