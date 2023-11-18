@@ -160,8 +160,8 @@ if __name__ == "__main__":
 
     # training / optimisation
     p.add_argument('--learning_rate', type=float, default=3e-4)
-    p.add_argument('--n_epochs', default=10)
-    p.add_argument('--batch_size', default=128)
+    p.add_argument('--n_epochs', type=int, default=10)
+    p.add_argument('--batch_size', type=int, default=128)
 
     # obtain and log arguments to console
     args = p.parse_args()
