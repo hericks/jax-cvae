@@ -119,9 +119,16 @@ def infinite_dataloader(images, labels, batch_size, *, rng):
             start, end = end, end + batch_size
             yield images[batch_indices], labels[batch_indices]
 
-def reconstruction_error(mean, sample):
+def gaussian_log_likelihood(mean, sample):
     # TODO. Add variance term
     return 0.5 * jnp.sum(jnp.square(mean - sample))
+
+def bernoulli_log_likelihood(logits, labels):
+    # with soft labels
+    return - jnp.sum(labels * jnp.log(logits) + (1.0 - labels) * jnp.log(1 - logits))
+
+def reconstruction_error(mean, sample):
+    bernoulli_log_likelihood(logits=mean, labels=sample)
 
 def kullback_leibler_divergence(mean, logvar):
     return - 0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
