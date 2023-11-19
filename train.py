@@ -16,11 +16,12 @@ class Encoder(eqx.Module):
     hidden: eqx.nn.Linear
     logvar: eqx.nn.Linear
     mean: eqx.nn.Linear
+    is_conditional: bool
 
-    def __init__(self, hidden_dim, latent_dim, *, rng):
+    def __init__(self, hidden_dim, latent_dim, is_conditional, *, rng):
         hidden_rng, mean_rng, logvar_rng = jax.random.split(rng, 3)
         self.hidden = eqx.nn.Linear(
-            in_features=28*28, out_features=hidden_dim, key=hidden_rng
+            in_features=28*28 + 10*is_conditional, out_features=hidden_dim, key=hidden_rng
         )
         self.logvar = eqx.nn.Linear(
             in_features=hidden_dim, out_features=latent_dim, key=logvar_rng
@@ -28,9 +29,14 @@ class Encoder(eqx.Module):
         self.mean = eqx.nn.Linear(
             in_features=hidden_dim, out_features=latent_dim, key=mean_rng
         )
+        self.is_conditional = is_conditional
 
-    def __call__(self, x):
+    def __call__(self, x, label=None):
         x = jnp.ravel(x)
+
+        if self.is_conditional:
+            x = jnp.concatenate([x, label])
+
         x = self.hidden(x)
         x = jax.nn.sigmoid(x)
         return self.mean(x), self.logvar(x)
@@ -38,17 +44,22 @@ class Encoder(eqx.Module):
 class Decoder(eqx.Module):
     hidden: eqx.nn.Linear
     output: eqx.nn.Linear
+    is_conditional: bool
 
-    def __init__(self, hidden_dim, latent_dim, *, rng):
+    def __init__(self, hidden_dim, latent_dim, is_conditional, *, rng):
         hidden_rng, output_rng = jax.random.split(rng)
         self.hidden = eqx.nn.Linear(
-            in_features=latent_dim, out_features=hidden_dim, key=hidden_rng
+            in_features=latent_dim + 10*is_conditional, out_features=hidden_dim, key=hidden_rng
         )
         self.output = eqx.nn.Linear(
             in_features=hidden_dim, out_features=28*28, key=output_rng
         )
+        self.is_conditional = is_conditional
 
-    def __call__(self, z):
+    def __call__(self, z, label):
+        if self.is_conditional:
+            z = jnp.concatenate([z, label])
+
         z = self.hidden(z)
         z = jax.nn.sigmoid(z)
         z = self.output(z)
@@ -59,15 +70,15 @@ class VAE(eqx.Module):
     encoder: Encoder
     decoder: Decoder
 
-    def __init__(self, hidden_dim, latent_dim, *, rng):
+    def __init__(self, hidden_dim, latent_dim, is_conditional, *, rng):
         encoder_rng, decoder_rng = jax.random.split(rng)
-        self.encoder = Encoder(hidden_dim, latent_dim, rng=encoder_rng)
-        self.decoder = Decoder(hidden_dim, latent_dim, rng=decoder_rng)
+        self.encoder = Encoder(hidden_dim, latent_dim, is_conditional, rng=encoder_rng)
+        self.decoder = Decoder(hidden_dim, latent_dim, is_conditional, rng=decoder_rng)
 
-    def __call__(self, x, *, rng):
-        mean, logvar = self.encoder(x)
+    def __call__(self, x, label, *, rng):
+        mean, logvar = self.encoder(x, label=label)
         z = self.reparameterize(mean, logvar, rng=rng)
-        x_recon = self.decoder(z)
+        x_recon = self.decoder(z, label=label)
         return x_recon, mean, logvar
 
     def reparameterize(self, mean, logvar, *, rng):
@@ -135,10 +146,10 @@ def reconstruction_error(mean, sample):
 def kullback_leibler_divergence(mean, logvar):
     return - 0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
 
-def vae_loss(model, x, *, rng):
+def vae_loss(model, x, labels, *, rng):
     rng_batch = jax.random.split(rng, x.shape[0])
 
-    x_recon, mean, logvar = jax.vmap(model)(x, rng=rng_batch)
+    x_recon, mean, logvar = jax.vmap(model)(x, labels, rng=rng_batch)
 
     kl = jax.vmap(kullback_leibler_divergence)(mean, logvar)
     neg_recon_error = - jax.vmap(reconstruction_error)(x_recon, x)
@@ -175,7 +186,7 @@ if __name__ == "__main__":
     rng, model_rng, dataloader_rng = jax.random.split(rng, 3)
 
     # initialize model and optimizer state
-    vae = VAE(hidden_dim=args.hidden_dim, latent_dim=args.latent_dim, rng=model_rng)
+    vae = VAE(hidden_dim=args.hidden_dim, latent_dim=args.latent_dim, is_conditional=args.conditional, rng=model_rng)
     optim = optax.adam(learning_rate=args.learning_rate)
     opt_state = optim.init(eqx.filter(vae, eqx.is_array))
 
@@ -192,8 +203,8 @@ if __name__ == "__main__":
 
     # define jitted training step function
     @eqx.filter_jit
-    def make_step(vae, opt_state, x, *, rng):
-        loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, x, rng=rng)
+    def make_step(vae, opt_state, x, labels, *, rng):
+        loss, grads = eqx.filter_value_and_grad(vae_loss)(vae, x, labels, rng=rng)
         updates, opt_state = optim.update(grads, opt_state, vae)
         vae = eqx.apply_updates(vae, updates)
         return vae, opt_state, loss
@@ -204,7 +215,7 @@ if __name__ == "__main__":
         rng, step_rng = jax.random.split(rng)
 
         # perform training step
-        vae, opt_state, loss = make_step(vae, opt_state, image_batch, rng=step_rng)
+        vae, opt_state, loss = make_step(vae, opt_state, image_batch, label_batch, rng=step_rng)
 
         # log metrics
         epoch, batch = divmod(batch_idx, n_batches_per_epoch)
