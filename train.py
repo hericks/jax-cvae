@@ -169,7 +169,7 @@ if __name__ == "__main__":
     p.add_argument('--hidden_dim', type=int, help="encoder and decoder hidden dimension", default=128)
     p.add_argument('--latent_dim', type=int, help="latent dimension", default=6)
 
-    # vae
+    # vae vs conditional vae
     p.add_argument('--conditional', action="store_true")
 
     # training / optimisation
