@@ -2,9 +2,7 @@ import gzip
 import os
 import struct
 import urllib.request
-
 import configargparse
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -16,12 +14,11 @@ class Encoder(eqx.Module):
     hidden: eqx.nn.Linear
     logvar: eqx.nn.Linear
     mean: eqx.nn.Linear
-    is_conditional: bool
 
-    def __init__(self, hidden_dim, latent_dim, is_conditional, *, rng):
+    def __init__(self, input_dim, hidden_dim, latent_dim, *, rng):
         hidden_rng, mean_rng, logvar_rng = jax.random.split(rng, 3)
         self.hidden = eqx.nn.Linear(
-            in_features=28*28 + 10*is_conditional, out_features=hidden_dim, key=hidden_rng
+            in_features=input_dim, out_features=hidden_dim, key=hidden_rng
         )
         self.logvar = eqx.nn.Linear(
             in_features=hidden_dim, out_features=latent_dim, key=logvar_rng
@@ -29,14 +26,8 @@ class Encoder(eqx.Module):
         self.mean = eqx.nn.Linear(
             in_features=hidden_dim, out_features=latent_dim, key=mean_rng
         )
-        self.is_conditional = is_conditional
 
-    def __call__(self, x, label=None):
-        x = jnp.ravel(x)
-
-        if self.is_conditional:
-            x = jnp.concatenate([x, label])
-
+    def __call__(self, x):
         x = self.hidden(x)
         x = jax.nn.sigmoid(x)
         return self.mean(x), self.logvar(x)
@@ -44,42 +35,48 @@ class Encoder(eqx.Module):
 class Decoder(eqx.Module):
     hidden: eqx.nn.Linear
     output: eqx.nn.Linear
-    is_conditional: bool
 
-    def __init__(self, hidden_dim, latent_dim, is_conditional, *, rng):
+    def __init__(self, latent_dim, hidden_dim, output_dim, *, rng):
         hidden_rng, output_rng = jax.random.split(rng)
         self.hidden = eqx.nn.Linear(
-            in_features=latent_dim + 10*is_conditional, out_features=hidden_dim, key=hidden_rng
+            in_features=latent_dim, out_features=hidden_dim, key=hidden_rng
         )
         self.output = eqx.nn.Linear(
-            in_features=hidden_dim, out_features=28*28, key=output_rng
+            in_features=hidden_dim, out_features=output_dim, key=output_rng
         )
-        self.is_conditional = is_conditional
 
-    def __call__(self, z, label):
-        if self.is_conditional:
-            z = jnp.concatenate([z, label])
-
+    def __call__(self, z):
         z = self.hidden(z)
         z = jax.nn.sigmoid(z)
         z = self.output(z)
         z = jax.nn.sigmoid(z)
-        return jnp.reshape(z, (1, 28, 28))
+        return z
     
 class VAE(eqx.Module):
     encoder: Encoder
     decoder: Decoder
+    is_conditional: bool
 
     def __init__(self, hidden_dim, latent_dim, is_conditional, *, rng):
         encoder_rng, decoder_rng = jax.random.split(rng)
-        self.encoder = Encoder(hidden_dim, latent_dim, is_conditional, rng=encoder_rng)
-        self.decoder = Decoder(hidden_dim, latent_dim, is_conditional, rng=decoder_rng)
+        self.encoder = Encoder(28*28 + 10*is_conditional, hidden_dim, latent_dim, rng=encoder_rng)
+        self.decoder = Decoder(latent_dim + 10*is_conditional, hidden_dim, 28*28, rng=decoder_rng)
+        self.is_conditional = is_conditional
 
     def __call__(self, x, label, *, rng):
-        mean, logvar = self.encoder(x, label=label)
+        x = jnp.ravel(x)
+
+        if self.is_conditional:
+            x = jnp.concatenate([x, label])
+
+        mean, logvar = self.encoder(x)
         z = self.reparameterize(mean, logvar, rng=rng)
-        x_recon = self.decoder(z, label=label)
-        return x_recon, mean, logvar
+
+        if self.is_conditional:
+            z = jnp.concatenate([z, label])
+
+        x_recon = self.decoder(z)
+        return jnp.reshape(x_recon, (1, 28, 28)), mean, logvar
 
     def reparameterize(self, mean, logvar, *, rng):
         std = jnp.exp(0.5 * logvar)
